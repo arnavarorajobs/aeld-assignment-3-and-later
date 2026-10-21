@@ -7,7 +7,7 @@ set -u
 set -o pipefail
 
 OUTDIR=/tmp/aeld
-KERNEL_REPO=https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git
+KERNEL_TARBALL_URL="https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-${KERNEL_VERSION#v}.tar.xz"
 KERNEL_VERSION=v5.15.163
 BUSYBOX_VERSION=1.33.1
 FINDER_APP_DIR=$(realpath "$(dirname "$0")")
@@ -30,25 +30,31 @@ if ! mkdir -p "$OUTDIR"; then
 fi
 OUTDIR=$(realpath "$OUTDIR")
 
-cd "$OUTDIR"
-if [ ! -d "${OUTDIR}/linux-stable" ]; then
-    #Clone only if the repository does not exist.
-	echo "CLONING GIT LINUX STABLE VERSION ${KERNEL_VERSION} IN ${OUTDIR}"
-    git clone --depth 1 --single-branch --branch "$KERNEL_VERSION" \
-        "$KERNEL_REPO" "$OUTDIR/linux-stable"
+KERNEL_SRC="$OUTDIR/linux-stable"
+KERNEL_TARBALL="$OUTDIR/linux-${KERNEL_VERSION#v}.tar.xz"
+
+if [ ! -f "$KERNEL_TARBALL" ] || ! tar -tJf "$KERNEL_TARBALL" >/dev/null 2>&1; then
+    echo "Downloading kernel source tarball for $KERNEL_VERSION"
+    wget --tries=5 --timeout=30 \
+        -O "$KERNEL_TARBALL.tmp" "$KERNEL_TARBALL_URL"
+    tar -tJf "$KERNEL_TARBALL.tmp" >/dev/null
+    mv "$KERNEL_TARBALL.tmp" "$KERNEL_TARBALL"
 fi
 
-if [ ! -e "$OUTDIR/linux-stable/arch/$ARCH/boot/Image" ]; then
-    cd linux-stable
-    echo "Checking out version ${KERNEL_VERSION}"
-    git checkout ${KERNEL_VERSION}
+if [ ! -f "$KERNEL_SRC/Makefile" ]; then
+    rm -rf "$KERNEL_SRC"
+    mkdir -p "$KERNEL_SRC"
+    tar -xJf "$KERNEL_TARBALL" --strip-components=1 \
+        -C "$KERNEL_SRC"
+fi
 
-    # TODO: Add your kernel build steps here
+if [ ! -e "$KERNEL_SRC/arch/$ARCH/boot/Image" ]; then
+    cd "$KERNEL_SRC"
     make ARCH="$ARCH" CROSS_COMPILE="$CROSS_COMPILE" defconfig
     make -j"$(nproc)" ARCH="$ARCH" CROSS_COMPILE="$CROSS_COMPILE" Image
 fi
 
-cp "$OUTDIR/linux-stable/arch/$ARCH/boot/Image" "$OUTDIR/Image"
+cp "$KERNEL_SRC/arch/$ARCH/boot/Image" "$OUTDIR/Image"
 
 echo "Creating the staging directory for the root filesystem"
 cd "$OUTDIR"
