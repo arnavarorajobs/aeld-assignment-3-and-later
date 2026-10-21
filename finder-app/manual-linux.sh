@@ -7,8 +7,8 @@ set -u
 set -o pipefail
 
 OUTDIR=/tmp/aeld
-KERNEL_TARBALL_URL="https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-${KERNEL_VERSION#v}.tar.xz"
 KERNEL_VERSION=v5.15.163
+KERNEL_TARBALL_URL="https://mirrors.edge.kernel.org/pub/linux/kernel/v5.x/linux-${KERNEL_VERSION#v}.tar.xz"
 BUSYBOX_VERSION=1.33.1
 FINDER_APP_DIR=$(realpath "$(dirname "$0")")
 ARCH=arm64
